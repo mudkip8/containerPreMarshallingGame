@@ -2,4 +2,5 @@ import pygame
 
 
 class EndScreen:
-    pass
+    def __init__(self, screen):
+        pass
