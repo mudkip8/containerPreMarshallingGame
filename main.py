@@ -18,7 +18,7 @@ scenes = {'Start': StartScreen(screen),
 
 
 def run_game():
-    scene = scenes['Start']
+    scene = scenes['Game']
     running = True
     while running:
         timer.tick(fps)
