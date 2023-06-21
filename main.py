@@ -1,7 +1,5 @@
 import pygame
-from startScreen import StartScreen
 from gameScreen import GameScreen
-from endScreen import EndScreen
 
 pygame.init()
 SCREEN_WIDTH = 1200
@@ -12,13 +10,8 @@ timer = pygame.time.Clock()
 fps = 30
 pygame.display.set_caption("Container Pre-Marshalling Game")
 
-scenes = {'Start': StartScreen(screen),
-          'Game': GameScreen(screen),
-          'End': EndScreen(screen)}
-
-
 def run_game():
-    scene = scenes['Game']
+    scene = GameScreen(screen)
     running = True
     while running:
         timer.tick(fps)
@@ -26,10 +19,9 @@ def run_game():
             if event.type == pygame.QUIT:
                 running = False
                 break
-            new_scene = scene.handle_event(event)
+            scene.handle_event(event)
             scene.draw(screen)
-            if new_scene:
-                scene = scenes[new_scene]
+
         pygame.display.flip()
 
 

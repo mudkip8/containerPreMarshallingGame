@@ -23,19 +23,28 @@ class GameScreen:
         self.slot_start_y = 140
         self.row_boundaries = [self.slot_start_x + (self.cntr_width + self.spacing) * num for num in range(6)]
         self.move_count = 0
-        self.font = pygame.font.Font(None, 30)
+        self.font = pygame.font.Font(None, 24)
         self.rule_text = self.font.render("", True, 'white')
         self.row_boxes = []
         self.is_origin_selected = False
         self.origin_row = None
         self.hover_rect = None
+        self.is_win = False
 
     def check_legal_move(self, origin, dest):
+        if origin == dest:
+            return False, ""
         if len([cntr for cntr in self.slot_layout[origin] if cntr > 0]) == 0:
             return False, f"Row {origin + 1} Is Empty!"
         if len([cntr for cntr in self.slot_layout[dest] if cntr > 0]) >= self.row_max_heights[dest]:
             return False, f"Row {dest + 1} Is Full!"
         return True, ""
+
+    def check_win(self):
+        for row in self.slot_layout:
+            if any(row[i] < row[i+1] for i in range(len(row) - 1)):
+                return False
+        return True
 
     def make_move(self, origin, dest):
         dest_level = self.slot_layout[dest].index(0)
@@ -43,32 +52,47 @@ class GameScreen:
         origin_cntr = self.slot_layout[origin][origin_len - 1]
         self.slot_layout[origin][origin_len - 1] = 0
         self.slot_layout[dest][dest_level] = origin_cntr
+        self.is_win = self.check_win()
+
+    def reset(self):
+        self.slot_layout = copy.deepcopy(self.initial_state)
+        self.move_count = 0
+        self.rule_text = self.font.render("", True, 'white')
+        self.row_boxes = []
+        self.is_origin_selected = False
+        self.origin_row = None
+        self.hover_rect = None
+        self.is_win = False
 
     def handle_event(self, event: pygame.event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            rule_error_message = ""
+        if not self.is_win:
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                rule_error_message = ""
+                for i, rect in enumerate(self.row_boxes):
+                    if rect.collidepoint(event.pos):
+                        if not self.is_origin_selected:
+                            self.origin_row = i
+                            self.is_origin_selected = True
+                        else:
+                            is_legal, rule_error_message = self.check_legal_move(self.origin_row, i)
+                            if is_legal:
+                                self.make_move(self.origin_row, i)
+                                self.move_count += 1
+                            self.origin_row = None
+                            self.is_origin_selected = False
+                self.rule_text = self.font.render(rule_error_message, True, 'red')
+            mouse_pos = pygame.mouse.get_pos()
             for i, rect in enumerate(self.row_boxes):
-                if rect.collidepoint(event.pos):
-                    if not self.is_origin_selected:
-                        self.origin_row = i
-                        self.is_origin_selected = True
-                    else:
-                        is_legal, rule_error_message = self.check_legal_move(self.origin_row, i)
-                        if is_legal:
-                            self.make_move(self.origin_row, i)
-                            self.move_count += 1
-                        self.origin_row = None
-                        self.is_origin_selected = False
-            self.rule_text = self.font.render(rule_error_message, True, 'red')
-        mouse_pos = pygame.mouse.get_pos()
-        for i, rect in enumerate(self.row_boxes):
-            if rect.collidepoint(mouse_pos):
-                if rect != self.origin_row:
-                    self.hover_rect = pygame.Rect(self.row_boundaries[i] - 5, self.slot_start_y - 5,
-                                                  self.cntr_width + 10, self.cntr_height * 5 + 10)
-                    return None
-        self.hover_rect = None
-        return None
+                if rect.collidepoint(mouse_pos):
+                    if rect != self.origin_row:
+                        self.hover_rect = pygame.Rect(self.row_boundaries[i] - 5, self.slot_start_y - 5,
+                                                      self.cntr_width + 10, self.cntr_height * 5 + 10)
+                        return
+            self.hover_rect = None
+        else:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
+                self.reset()
+
 
     def draw(self, screen: pygame.Surface):
         screen.fill('white')
@@ -97,15 +121,18 @@ class GameScreen:
             row_label_rect.centerx = self.row_boundaries[row_num] + self.cntr_width // 2
             row_label_rect.centery = self.slot_start_y + 5 * self.cntr_height + self.spacing
             screen.blit(row_label_text, row_label_rect)
-            if self.hover_rect:
-                pygame.draw.rect(screen, 'dark blue', self.hover_rect, 5)
-            if self.is_origin_selected:
-                select_rect = pygame.Rect(self.row_boundaries[self.origin_row] - 5, self.slot_start_y - 5, self.cntr_width + 10,
-                                          self.cntr_height * 5 + 10)
-                pygame.draw.rect(screen, 'green', select_rect, 5)
-            text_width = self.rule_text.get_width()
-            screen.blit(self.rule_text, ((screen.get_width() - text_width) // 2, self.slot_start_y + 6 * self.cntr_height))
-            move_counter_text = self.font.render(f"Number of moves: {self.move_count}", True, 'black')
-            screen.blit(move_counter_text, (10, 10))
+        if self.hover_rect and not self.is_win:
+            pygame.draw.rect(screen, 'dark blue', self.hover_rect, 5)
+        if self.is_origin_selected:
+            select_rect = pygame.Rect(self.row_boundaries[self.origin_row] - 5, self.slot_start_y - 5, self.cntr_width + 10,
+                                      self.cntr_height * 5 + 10)
+            pygame.draw.rect(screen, 'green', select_rect, 5)
+        if self.is_win:
+            self.rule_text = self.font.render(f"YOU WIN!!! NUMBER OF MOVES: {self.move_count}  "
+                                              f"PRESS ENTER TO RESTART", True, "black")
+        rule_text_width = self.rule_text.get_width()
+        screen.blit(self.rule_text, ((screen.get_width() - rule_text_width) // 2, self.slot_start_y + 6 * self.cntr_height))
+        move_counter_text = self.font.render(f"Number of moves: {self.move_count}", True, 'black')
+        screen.blit(move_counter_text, (10, 10))
 
         self.row_boxes = row_boxes
